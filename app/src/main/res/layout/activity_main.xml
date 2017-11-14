@@ -52,7 +52,7 @@
             <EditText
                 android:id="@+id/tag_field_view"
                 android:inputType="text"
-                android:layout_width="wrap_content"
+                android:layout_width="70dp"
                 android:layout_height="wrap_content" />
 
         </LinearLayout>
@@ -70,7 +70,7 @@
             <EditText
                 android:id="@+id/size_field_view"
                 android:inputType="number"
-                android:layout_width="wrap_content"
+                android:layout_width="70dp"
                 android:layout_height="wrap_content" />
 
         </LinearLayout>
@@ -79,6 +79,12 @@
             android:orientation="horizontal"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content">
+
+            <Button
+                android:text="◀"
+                android:onClick="prevMatch"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content" />
 
             <Button
                 android:text="Save"
@@ -92,12 +98,18 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content" />
 
+            <Button
+                android:text="▶"
+                android:onClick="nextMatch"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content" />
+
         </LinearLayout>
 
         <Button
             android:text="Capture"
             android:onClick="capture"
-            android:layout_width="wrap_content"
+            android:layout_width="150dp"
             android:layout_height="wrap_content" />
 
     </LinearLayout>

@@ -39,6 +39,10 @@ public class MainActivity extends AppCompatActivity {
     private int mCurrentID;
     private int mCurrentSize;
 
+    private Cursor mCursor;
+    private int mNumResults;
+    private int mCurrentResult;
+
     static final int REQUEST_IMAGE_CAPTURE = 1;
 
     @Override
@@ -59,15 +63,18 @@ public class MainActivity extends AppCompatActivity {
         mDatabase.execSQL("DROP TABLE IF EXISTS Tags");
         mDatabase.execSQL("CREATE TABLE Tags (ID INTEGER, tag TEXT)");
 
-        mDatabase.execSQL("INSERT INTO Photos VALUES (2, 'sdcard/p2.jpg', 200)");
-        mDatabase.execSQL("INSERT INTO Photos VALUES (3, 'sdcard/p3.jpg', 300)");
-        mDatabase.execSQL("INSERT INTO Photos VALUES (4, 'sdcard/p4.jpg', 200)");
-
         mCurrentID = 0;
+        mCurrentSize = -1;
+        mNumResults = -1;
     }
 
     public void save(View v) {
         Log.v("wonkity wonk", "Save button clicked");
+        if (mCurrentSize < 0) {
+            displayToast("Please take a picture first");
+            return;
+        }
+        mCurrentID++; // Update ID
         String idString = Integer.toString(mCurrentID);
         String sizeString = Integer.toString(mCurrentSize);
         mDatabase.execSQL("INSERT INTO Photos VALUES (" +
@@ -78,6 +85,25 @@ public class MainActivity extends AppCompatActivity {
         for (String tag: tagsList) {
             mDatabase.execSQL("INSERT INTO Tags VALUES (" + idString + ", '" + tag + "')");
         }
+        String report = "Saved image with tags: ";
+        for (int i = 0; i < tagsList.length; i++) {
+            report += tagsList[i];
+            if (i != tagsList.length-1) {
+                report += ", ";
+            }
+        }
+        displayToast(report);
+        mThumbnailView.setImageBitmap(null);
+        mTagsListView.setText("");
+        mSizeView.setText("");
+
+        // Reset mCurrentSize to avoid saving multiple images in a row
+        mCurrentSize = -1;
+    }
+
+    private void displayToast(String report) {
+        Toast toast = Toast.makeText(getApplicationContext(), report, Toast.LENGTH_SHORT);
+        toast.show();
     }
 
     public void load(View v) {
@@ -85,9 +111,7 @@ public class MainActivity extends AppCompatActivity {
         String tagString = mTagsListView.getText().toString();
         String sizeString = mSizeView.getText().toString();
         if (tagString.length() == 0 && sizeString.length() == 0) {
-            CharSequence report = "No tags or size specified";
-            Toast toast = Toast.makeText(getApplicationContext(), report, Toast.LENGTH_SHORT);
-            toast.show();
+            displayToast("No tags or size specified");
             return;
         }
         String query = "SELECT Photos.ID, location, size, tag FROM " +
@@ -109,18 +133,36 @@ public class MainActivity extends AppCompatActivity {
             query += " AND (size <= " + maxSize + " AND size >= " + minSize + ")";
         }
 
-        Cursor c = mDatabase.rawQuery(query, null);
-        c.moveToFirst();
+        mCursor = mDatabase.rawQuery(query, null);
 
-        String str = "";
-
-        for (int i = 0; i < 1; i++) {
-            for (int j = 0; j < c.getColumnCount(); j++) {
-                str = str + c.getString(j) + "\n";
-            }
-            Log.v("wonkity wonk", str);
-            c.moveToNext();
+        if (mCursor.getCount() == 0) {
+            displayToast("No matching images found");
+            mThumbnailView.setImageBitmap(null);
+            return;
         }
+
+        mCursor.moveToFirst();
+        mNumResults = mCursor.getCount();
+        mCurrentResult = 0;
+
+        updateThumbnail();
+    }
+
+    private void updateThumbnail() {
+        String path = mCursor.getString(1);
+        File photoFile = new File(path);
+        String absolutePath = photoFile.getAbsolutePath();
+        if (photoFile.exists()) {
+            Bitmap bmp = BitmapFactory.decodeFile(absolutePath);
+            mThumbnailView.setImageBitmap(bmp);
+        } else {
+            displayToast("Error retrieving image: " + absolutePath);
+        }
+        String str = "";
+        for (int j = 0; j < mCursor.getColumnCount(); j++) {
+            str = str + mCursor.getString(j) + "\n";
+        }
+        Log.v("wonkity wonk", str);
     }
 
     private File createPhotoFile() throws IOException {
@@ -173,6 +215,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Set the photo size text view
         mPhotoSizeView.setText(Integer.toString(photoW) + " x " + Integer.toString(photoH));
+        mSizeView.setText(Integer.toString(photoW * photoH));
 
         // Determine how much to scale down the image
         int scaleFactor = Math.min(photoW/targetW, photoH/targetH);
@@ -184,5 +227,34 @@ public class MainActivity extends AppCompatActivity {
 
         Bitmap bitmap = BitmapFactory.decodeFile(mCurrentPhotoPath, bmOptions);
         mThumbnailView.setImageBitmap(bitmap);
+    }
+
+    public void nextMatch(View v) {
+        if (mCursor == null || mNumResults < 0) {
+            displayToast("Please run a search query first");
+            return;
+        }
+        mCurrentResult = (mCurrentResult + 1) % mNumResults;
+        if (mCurrentResult == 0) {
+            mCursor.moveToFirst();
+        } else {
+            mCursor.moveToNext();
+        }
+        updateThumbnail();
+    }
+
+    public void prevMatch(View v) {
+        if (mCursor == null || mNumResults < 0) {
+            displayToast("Please run a search query first");
+            return;
+        }
+        if (mCurrentResult == 0) {
+            mCurrentResult = mNumResults - 1;
+            mCursor.moveToLast();
+        } else {
+            mCurrentResult = mCurrentResult - 1;
+            mCursor.moveToPrevious();
+        }
+        updateThumbnail();
     }
 }
